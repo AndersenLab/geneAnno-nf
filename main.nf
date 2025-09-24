@@ -9,7 +9,7 @@ date = new Date().format('yyyyMMdd')
 log.info("Source: ${params.source}.")
 
 println '''
---samplesheet expects the filtered assembly stats table output from assembly-nf by defualt.
+--samplesheet expects the filtered assembly stats table output from assembly-nf by default.
 To run ONLY BRAKER3, use "--source only-braker" and provide a TSV to --sample_sheet that contains columns: species, strain, asm_path
 '''
 
@@ -25,6 +25,11 @@ To run ONLY BRAKER3, use "--source only-braker" and provide a TSV to --sample_sh
 
 */
 
+
+
+/// ADD A SPECIES PARAMETER FOR WHICH PROTEOM TO USE:
+/// elegans - N2; tropiclais - N2 + NIC58; briggsae - AF16 + N2; nigoni - eukaryota 
+
 if (params.debug) {
     println """
     *** Using debug mode ***
@@ -38,7 +43,7 @@ if (params.debug) {
             """
         if (params.sample_sheet == null) {
             println """
-            Please specify a sample sheet with parameter --sample_sheet.
+            Please specify a sample sheet with parameter --sample_sheet. The sample sheet should be the filtered asm stats sheet that is output from assemlby-nf.
             """
             exit 1
         }
@@ -56,7 +61,7 @@ if (params.debug) {
                 """
             if (params.sample_sheet == null) {
                 println """
-                Please specify a sample sheet with parameter --sample_sheet.
+                Please specify a sample sheet with parameter --sample_sheet. The sample sheet should be a TSV with header: species, strain, asm_path
                 """
                 exit 1
             }
@@ -73,6 +78,12 @@ if (params.debug) {
             exit 1
     }
 }
+
+
+/// ADD A SPECIES PARAMETER FOR WHICH PROTEOM TO USE:
+/// elegans - N2; tropiclais - N2 + NIC58; briggsae - AF16 + N2; nigoni - eukaryota 
+
+
 
 
 def log_summary() {
@@ -109,21 +120,62 @@ workflow {
                         .map { row -> [row.species, row.strain, row.asm_path] } 
         
         braker3(braker_ch)
-
-        busco_p_ch = braker3.out.geneAnno()
         
         agat_ch = braker3.out.geneAnno
-                    .map { species, strain, asm_path, gff3 -> tuple(species, strain, gff3) }
+                    .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
         
         longestIso(agat_ch)
 
-        agat_output_ch = (agat_ch.geneAnno)
+        agat_output_ch = longestIso.out.longest 
+                            .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
         
-        proteome(agat_output_ch, GENOME)
+        proteome(agat_output_ch)
 
-        buscoProt(busco_p_ch)
+        busco_p_ch = proteome.out.prot
+                        .map { species, strain, asm_path, prot_path -> tuple(species, strain, prot_path) }
 
-        gatherAllStats()
+        busco_prot(busco_p_ch)
+
+        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+
+        gff_path_ch = braker3.out.geneAnno.map { species, strain, asm_path, gff3 -> 
+                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}"
+                        tuple(strain, full_path) } // need the full path to where gff3 is published... something like ${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}
+
+        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+
+        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  
+            .join(gff_path_ch)
+            .join(busco_stats_ch)
+            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                // Add the new columns to the sample row
+                sample_row.gff3_path = gff_path
+                sample_row.proteome_path = prot_path
+                sample_row.protein_busco = busco_prot
+                return sample_row
+            }
+
+
+        final_table = combined_ch
+            .collect()  // This ensures all data is gathered before processing
+            .map { rows ->
+                if (rows.isEmpty()) return ""
+                
+                // Create header from first row keys
+                def header = rows[0].keySet().join('\t')
+                
+                // Create data rows
+                def data = rows.collect { row -> 
+                    row.values().join('\t') 
+                }.join('\n')
+                
+                return header + '\n' + data + '\n'
+            }
+            .collectFile(
+                name: "${params.outdir}_all_stats.tsv",
+                storeDir: "${workflow.launchDir}/${params.output}")
+            .view { "Final table created: $it" 
+        
     }
     
 }
@@ -178,36 +230,57 @@ process braker3 {
     """
 }
 
-/*
+
 process longestIso {
 
     publishDir(
         path: "${params.output}",
         mode: 'copy',
+        pattern: "**/*.gff3",
     )
     
     label 'agat'
 
     input:
-    tuple val(species), val(strain), path(gff3)
+    tuple val(species), val(strain), path(asm_path), path(gff3)
 
     output:
-    tuple val(species), val(strain), path(asm_path), path(".gff3"), emit: geneAnno
+    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/${gff3.baseName}.longest.gff3"), emit: longest
 
     script:
     """
-    agat_sp_keep_longest_isoform.pl  -f $file -o ${file%.*}.longest.gff3
+    mkdir -p ${species}/${strain}
+    agat_sp_keep_longest_isoform.pl  -f $gff3 -o ${species}/${strain}/${gff3.baseName}.longest.gff3
 
     """
 }
 
+
 process proteome {
 
+    publishDir(
+        path: "${params.output}",
+        mode: 'copy',
+        pattern: "**/*.protein.fa",
+    )
+    
+    label 'prot'
+
     input:
-    tuple val(species), val(strain), path(asm_path), path(".gff3")
+    tuple val(species), val(strain), path(asm_path), path(gff3)
 
+    output:
+    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/protein/${gff3.baseName}.protein.fa"), emit: prot
 
+    script:
+    """
+    mkdir -p ${species}/${strain}/protein
+
+    gffread -S $gff3 -g $asm_path -y ${species}/${strain}/protein/${gff3.baseName}.protein.fa
+
+    """ 
 }
+
 
 process busco_prot {
 
@@ -219,39 +292,22 @@ process busco_prot {
     label 'busco'
 
     input:
-    tuple val(strain), path(asm_path), val (species), path(.gff3)
+    tuple val(species), val(strain), path(prot_path)
 
     output:
-    path(".txt")
+    tuple val(species), val(strain), path("${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv"), emit: buscoStat
 
     script:
     """
-    run busco proteome and append to the filtered stats TXT
-    """
-}
+    mkdir -p ${species}/${strain}/busco
 
-process gatherAllStats {
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/elegans/busco_downloads/lineages/nematoda_odb10/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
-    publishDir(
-        path: "${params.output}",
-        mode: 'copy',
-    )
+    echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
+    grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb10.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
+    awk '{ match(\$0, /C:([0-9.]+)%/, a); print a[1] }' ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv 
+    paste -d '\t' <(echo "$strain") ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv <(echo "${workflow.launchDir}/${params.output}/${species}/${strain}/protein/${prot_path.baseName}.fa") > strain_busco.tsv
     
-    label 'gatherAllStats'
-
-    input:
-    tuple path(.txt), (busco_p)
-
-    output:
-    path(".txt")
-
-    script:
-    """
-    # Append busco proteome scores to final, filtered asm_stats table output from assembly-nf
-
-
-
-
+    cat header.tsv strain_busco.tsv > ${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv
     """
 }
-*/
