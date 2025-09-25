@@ -1,4 +1,4 @@
-This is a nextflow process that predicts gene models in selfing Caenorhabditis de novo assembled genomes using BRAKER3 guided with the N2 proteome. The input to this process is a TSV/TXT that contains three columns: species, strain, <pathToAssembly>. The TSV/TXT should not have a header.
+This is a nextflow process that predicts gene models in Caenorhabditis de novo assembled genomes using BRAKER3 guided with reference/Eukaryota proteomes. 
 
 ```
                                                                     __ 
@@ -10,3 +10,12 @@ This is a nextflow process that predicts gene models in selfing Caenorhabditis d
   __/ |                                                                
  |___/                                                                 
 ```
+This Nextflow process is meant to be run after [assembly-nf](https://github.com/AndersenLab/assembly-nf), and it will add full paths to files produced and busco protein stats directly to the stats sheet output from assembly-nf.
+
+## --source
+
+## --sample_sheet
+
+## --species
+
+## --outdir & -profile
