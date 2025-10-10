@@ -19,7 +19,7 @@ The parameter ```--source``` can be equal to "only-braker" or "default". If ```-
 The formatting of the supplied ```--sample_sheet``` is dependent on what ```--source``` is equal to. If ```--source``` is equal to "only-braker", then the provided ```--sample_sheet``` should be a TSV with headers: species, strain, asm_path. If ```--source``` is equal to "default", then the provided ```--sample_sheet``` can either be the stats TSV output from assembly-nf, or a custom TSV with any number of headers, but it must contain the required columns of: species, strain, asm_path. The absolute path to the ```--sample_sheet``` needs to be provided.
   
 ## --species
-The parameter ```--species``` can be equal to "c_elegans", "c_tropicalis", "c_briggsae", or "c_nigoni". The ```--species``` specifies which proteome/protein database to use for guided gene model predictions.
+The parameter ```--species``` can be equal to "c_elegans", "c_tropicalis", "c_briggsae", or "c_nigoni". The ```--species``` specifies which proteome/protein database to use for guided gene model predictions. Additionally, the specified species will determine which file is used for soft-masking an assembly prior to running BRAKER3.
 
 ## --outdir & -profile
 The parameter ```-profile``` specifies the configuration of the pipeline, inclusive of default parameters, resource allocation, and process-specific environments/containers. The only option for ```-profile``` right now is "rockfish". The user can created their own config file in /geneAnno-nf/conf/ if they wish to run on their HPC.
