@@ -23,7 +23,7 @@ To run ONLY BRAKER3, use "--source only-braker" and provide a TSV to --sample_sh
   __/ |                                                                
  |___/                                                                 
 
-*/
+*/ 
 
 if (params.debug) {
     println """
@@ -131,46 +131,35 @@ workflow {
         braker3(braker_ch, busco_db_lineage)
 
     } else if (params.source == "default") {
-                                                                                                                                                    //////////////////////////////// NEED TO ADD IFELSE STATMENT FOR NIGONI - WHICH DOES NOT HAVE A MASK FILE.... execute unmasked braker3 version
+                                                                                                                                                    //////////////////////////////// NEED TO ADD IFELSE STATMENT FOR NIGONI - WHICH DOES NOT HAVE A MASK FILE.... execute unmasked braker3 version and the "successful_annotations" channel
         busco_download() 
         busco_db_lineage = busco_download.out
-
-        // Will I need to incorporate a repreat masker step to mask genomes prior to running BRAKER3 to avoid 100K+ AA protein predictions??
-        // Example code:
-            // source activate rep_mask
-
-            // wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
-
-            // cd $wkdir/${GENOME%%.*}/repeatmasker/soft
-            // cp $wkdir/$GENOME $wkdir/${GENOME%%.*}/repeatmasker/soft/
-            // RepeatMasker -s -xsmall -lib $wkdir/${GENOME%%.*}/blastx/${GENOME%%.*}.clust.class.noprot.fa -gff -pa 16 $wkdir/${GENOME%%.*}/repeatmasker/soft/$GENOME
-
 
         mask_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .ifEmpty { exit 1, "Please provide the filtered assemlby stats sheet output from assembly-nf" }
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> [row.species, row.strain, row.asm_path] }
 
-        sfotMask(mask_ch)
+        softMask(mask_ch)
 
         braker_ch = softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
         
         braker3(braker_ch, busco_db_lineage)
 
-        successful_annotations = braker3.out.geneAnno
-            .filter { species, strain, asm_path, gff3_file ->
-                def success = gff3_file.size() > 100
-                if (!success) {
-                    log.info "Filtering out failed sample ${species}_${strain} because braker.gff3 could not be made (most likely >100K protein prediction)"
-                }
-                return success
-        }
+        // successful_annotations = braker3.out.geneAnno
+        //     .filter { species, strain, asm_path, gff3_file ->
+        //         def success = gff3_file.size() > 100
+        //         if (!success) {
+        //             log.info "Filtering out failed sample ${species}_${strain} because braker.gff3 could not be made (most likely >100K protein prediction)"
+        //         }
+        //         return success
+        // }
     
-        agat_ch = successful_annotations
-                    .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
+        // agat_ch = successful_annotations
+        //             .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
         
-        // agat_ch = braker3.out.geneAnno
-                    // .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
+        agat_ch = braker3.out.geneAnno
+                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
         
         // agat_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true) /// REMOVE - THIS WAS JUST FOR NIC
         //                 .ifEmpty { exit 1, "Please provide a TSV sample sheet that contains: species, strain, asm_path" }
@@ -180,13 +169,13 @@ workflow {
         longestIso(agat_ch)
 
         agat_output_ch = longestIso.out.longest 
-                            .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
+                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
 
         
         proteome(agat_output_ch)
 
         busco_p_ch = proteome.out.prot
-                        .map { species, strain, asm_path, prot_path -> tuple(species, strain, prot_path) }
+                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
 
         busco_prot(busco_p_ch)
 
@@ -194,12 +183,12 @@ workflow {
         
         // gff_path_ch = agat_ch.map { species, strain, asm_path, gff3 -> tuple(strain, gff3) } /// REMOVE - THIS WAS JUST FOR NIC
 
-        gff_path_ch = successful_annotations.map { species, strain, asm_path, gff3 -> 
-                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-                        tuple(strain, full_path) } 
-        // gff_path_ch = braker3.out.geneAnno.map { species, strain, asm_path, gff3 -> 
+        // gff_path_ch = successful_annotations.map { species, strain, asm_path, gff3 -> 
         //                 def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
         //                 tuple(strain, full_path) } 
+        gff_path_ch = braker3.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                        tuple(strain, full_path) } 
 
         busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
 
@@ -270,13 +259,15 @@ process softMask {
     tuple val(species), val(strain), path (asm_path)
 
     output:
-    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/${asm_path.baseName}_softMasked.fa"), emit: masked
+    tuple val(species), val(strain), path("${species}/${strain}/${asm_path.baseName}_softMasked.fa"), emit: masked
 
     script:
     """
     mkdir -p ${species}/${strain}
 
-    RepeatMasker -s -xsmall -lib $mask_file  -pa $asm_path
+    RepeatMasker -s -xsmall -lib $mask_file -pa ${task.cpus} $asm_path 
+
+    mv ${asm_path.name}.masked ${species}/${strain}/${asm_path.baseName}_softMasked.fa
 
     """
 
@@ -299,7 +290,7 @@ process braker3 {
     path(busco_db_lineage)
 
     output:
-    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
 
     script:
     """    
@@ -330,7 +321,7 @@ process braker3 {
         --workingdir ${species}/${strain}/braker/output 
 
     # Renaming "braker.gff3" that is produced:
-    #mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
+    mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
 
     """
 }
@@ -413,10 +404,10 @@ process longestIso {
     label 'agat'
 
     input:
-    tuple val(species), val(strain), path(asm_path), path(gff3)
+    tuple val(species), val(strain), path(asm_masked), path(gff3)
 
     output:
-    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/${gff3.baseName}.longest.gff3"), emit: longest
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/${gff3.baseName}.longest.gff3"), emit: longest
 
     script:
     """
@@ -438,16 +429,16 @@ process proteome {
     label 'prot'
 
     input:
-    tuple val(species), val(strain), path(asm_path), path(gff3)
+    tuple val(species), val(strain), path(asm_masked), path(gff3)
 
     output:
-    tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/protein/${gff3.baseName}.protein.fa"), emit: prot
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/protein/${gff3.baseName}.protein.fa"), emit: prot
 
     script:
     """
     mkdir -p ${species}/${strain}/protein
 
-    gffread -S $gff3 -g $asm_path -y ${species}/${strain}/protein/${gff3.baseName}.protein.fa
+    gffread -S $gff3 -g $asm_masked -y ${species}/${strain}/protein/${gff3.baseName}.protein.fa
 
     """ 
 }
