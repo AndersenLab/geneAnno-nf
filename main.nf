@@ -93,9 +93,9 @@ if (!braker_proteome) {
 
 // Which fasta to use for masking
 def mask_map= [
-    "c_elegans": "",
-    "c_tropicalis": "",
-    "c_briggsae": ""]
+    "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
+    "c_tropicalis": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
+    "c_briggsae": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
 
 def mask_file = mask_map[params.species]
 
@@ -131,7 +131,7 @@ workflow {
         braker3(braker_ch, busco_db_lineage)
 
     } else if (params.source == "default") {
-                                                                                                                                                    //////////////////////////////// NEED TO ADD IFELSE STATMENT FOR NIGONI - WHICH DOES NOT HAVE A MASK FILE....
+                                                                                                                                                    //////////////////////////////// NEED TO ADD IFELSE STATMENT FOR NIGONI - WHICH DOES NOT HAVE A MASK FILE.... execute unmasked braker3 version
         busco_download() 
         busco_db_lineage = busco_download.out
 
@@ -275,7 +275,8 @@ process softMask {
     script:
     """
     mkdir -p ${species}/${strain}
-    $mask_file $asm_path > ${species}/${strain}/${asm_path.baseName}_softMasked.fa
+
+    RepeatMasker -s -xsmall -lib $mask_file  -pa $asm_path
 
     """
 
@@ -335,7 +336,7 @@ process braker3 {
 }
 
 
-// process braker3 {
+// process braker3 { // rename to "braker3_unmasked"
 
 //     publishDir(
 //         path: "${params.output}",
