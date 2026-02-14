@@ -87,9 +87,16 @@ def braker_proteome = proteome_map[params.species]
 if (!braker_proteome) {
     error """
     Please provide a valid species to --species parameters. Either 'c_elegans', 'c_tropicalis', 'c_briggsae', or 'c_nigoni'.
-    """ 
-    }
+    """ }
 
+// def rna_seq_map = ["c_briggsae": ""]
+
+// def braker_rna_seq = rna_seq_map[params.species]
+
+// if (!braker_rna_seq) {
+//     error """
+//     As of right now, only species "c_briggsae" is compatible with this version of main.nf which incorporates CGC2 SR RNA-seq to help guide gene model prediction
+//     """}
 
 // Which fasta to use for masking
 def mask_map= [
@@ -190,7 +197,7 @@ workflow {
                         def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
                         tuple(strain, full_path) } 
 
-        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
 
         combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
             .join(gff_path_ch)
@@ -457,7 +464,7 @@ process busco_prot {
     tuple val(species), val(strain), path(prot_path)
 
     output:
-    tuple val(species), val(strain), path("${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv"), emit: buscoStat
+    tuple val(species), val(strain), path("${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv"), path("${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb10.${prot_path.baseName}.busco.txt"), emit: buscoStat
 
     script:
     """
