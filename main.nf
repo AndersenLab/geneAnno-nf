@@ -148,6 +148,15 @@ workflow {
                         .map { row -> [row.species, row.strain, row.asm_path] }
 
         softMask(mask_ch)
+	
+
+
+	// add conditional on if row.rna_seq1 and row.rna_seq2 are present
+	//	then perform braker with RNA seq
+	//	    process( STAR RNA aln ) 
+		//	also need a mode param to specify only RNA, RNA + prot, or only prot..... so maybe not column conditional
+
+
 
         braker_ch = softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
         
@@ -229,8 +238,7 @@ workflow {
             .collectFile(
                 name: "${params.outdir}_all_stats.tsv",
                 storeDir: "${workflow.launchDir}/${params.output}")
-            .view { "Final table created: $it" } 
-        
+            .view { "Final table created: $it" }    
     }
     
 }
@@ -279,6 +287,36 @@ process softMask {
     """
 
 }
+
+
+process rna_aln {
+	wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
+source activate star
+
+cd $wkdir/${GENOME%%.*}/alignments/
+STAR \
+--runThreadN 24 \
+--runMode genomeGenerate \
+--limitGenomeGenerateRAM 600000000000 \
+--genomeDir . \
+--genomeFastaFiles $wkdir/$GENOME \
+--genomeSAindexNbases 12 \
+--alignIntronMax 10000
+STAR \
+--runThreadN 24 \
+--genomeDir . \
+--outSAMtype BAM Unsorted SortedByCoordinate \
+--twopassMode Basic \
+--readFilesCommand zcat \
+--alignIntronMax 10000 \
+--readFilesIn $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.f.fq.gz $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.r.fq.gz
+
+
+--outSAMstrandField intronMotif # needed for StringTie compatibility with BRAKER3!
+}
+
+
+
 
 process braker3 {
 
