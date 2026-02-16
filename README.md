@@ -24,6 +24,8 @@ The parameter ```--species``` can be equal to "c_elegans", "c_tropicalis", "c_br
 ## --outdir & -profile
 The parameter ```-profile``` specifies the configuration of the pipeline, inclusive of default parameters, resource allocation, and process-specific environments/containers. The only option for ```-profile``` right now is "rockfish". The user can created their own config file in /geneAnno-nf/conf/ if they wish to run on their HPC.
 
+## --mode
+The parameters ```--mode``` is used to specify what sources of information you wish to have BRAKER3 use to guide gene model prediction. The user must set the mode to "prot", "rna_and_prot", or "rna" to indicate if BRAKER3 should use proteins to guide gene model prediction (previously benchmarked protein databases are used based on the ```--species``` parameter), short-read RNA-seq and proteins, or just short-read RNA-seq. If the user does not specify any ```--mode```, then the pipeline will run in default mode with only prteins guiding gene model creation. If ```--mode``` "rna" or "rna_and_prot" are specified, the user must provide the full path to paired-end RNA-seq data in the ```--sample_sheet``` with column headers "rna_1" and "rna_2".
 
 ## Use cases
 ### Running on newly assembled genomes output from assembly-nf:
