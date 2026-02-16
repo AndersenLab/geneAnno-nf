@@ -193,6 +193,10 @@ workflow {
             }
 
         } else if (params.mode == "rna_and_prot") {
+        // Transform braker_ch to use tuple key for joining on both species AND strain
+        braker_ch_keyed = braker_ch.map { species, strain, asm_masked -> 
+            [tuple(species, strain), asm_masked] }
+        
         // STAR process to perform RNA alignments to the provided reference genome
         rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .splitCsv(sep: "\t", header: true)
@@ -202,12 +206,15 @@ workflow {
                             error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
                         return [row.species, row.strain, row.rna_1, row.rna_2]}
                         // left_join with braker_ch based on species and strain
-                        .join(braker_ch)
+                        .join(braker_ch_keyed)// Inner join on [species, strain] tuple
+                        .map { key, rna_1, rna_2, asm_masked ->
+                            // Flatten back to: [species, strain, rna_1, rna_2, asm_masked]
+                            [key[0], key[1], rna_1, rna_2, asm_masked] }
                         .view()
 
-        rna_aln(rna_channel) // pull species, strain, and soft-masked genome from braker_ch
+        rna_aln(rna_channel) 
 
-        braker3_rna_and_prot(braker_ch, busco_db_lineage, rna_aln.out.x)
+        braker3_rna_and_prot(rna_aln.out.aligned, busco_db_lineage)
         
         agat_ch = braker3_rna_and_prot.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
@@ -247,13 +254,23 @@ workflow {
 
         } else if (params.mode == "rna") {
         // STAR process to perform RNA alignments to the provided reference genome
-        rna_channel = 
+        rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
+                        .splitCsv(sep: "\t", header: true)
+                        .map { row -> 
+                        // Check if required columns exist for RNA-guided gene model prediction
+                        if (!row.containsKey('rna_1') || !row.containsKey('rna_2')) {
+                            error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                        return [row.species, row.strain, row.rna_1, row.rna_2]}
+                        // left_join with braker_ch based on species and strain
+                        .join(braker_ch_keyed)// Inner join on [species, strain] tuple
+                        .map { key, rna_1, rna_2, asm_masked ->
+                            // Flatten back to: [species, strain, rna_1, rna_2, asm_masked]
+                            [key[0], key[1], rna_1, rna_2, asm_masked] }
+                        .view()
 
-        rna_aln(rna_channel)
+        rna_aln(rna_channel) 
 
-        braker3_rna_and_prot(braker_ch, busco_db_lineage, rna_aln.out.x)
-
-        braker3_rna(braker_ch, busco_db_lineage)
+        braker3_rna(rna_aln.out.aligned, busco_db_lineage)
         
         agat_ch = braker3_rna.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
@@ -371,7 +388,7 @@ process rna_aln {
     tuple val(species), valstrain), path(asm_masked), path(rna_1), path(rna_2)
 
     output: 
-    tuple val(species), val(strain), path(asm_masked), path("............/.bam")
+    tuple val(species), val(strain), path(asm_masked), path("............/.bam"), emit: aligned
     
     script:
     """
