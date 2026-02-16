@@ -29,4 +29,4 @@ The parameters ```--mode``` is used to specify what sources of information you w
 
 ## Use cases
 ### Running on newly assembled genomes output from assembly-nf:
-```nextflow run main.nf --source default --sample_sheet $PWD/nigoni_asm-nf_filteredStats.tsv --outdir nigoni_geneModels --species c_nigoni -profile rockfish ```
+```nextflow run main.nf --source default --sample_sheet $PWD/nigoni_asm-nf_filteredStats.tsv --outdir nigoni_geneModels --species c_nigoni --mode prot -profile rockfish ```
