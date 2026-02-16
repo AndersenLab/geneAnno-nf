@@ -197,12 +197,12 @@ workflow {
         rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> 
-                        // Check if required columns exist
+                        // Check if required columns exist for RNA-guided gene model prediction
                         if (!row.containsKey('rna_1') || !row.containsKey('rna_2')) {
                             error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
                         return [row.species, row.strain, row.rna_1, row.rna_2]}
                         // left_join with braker_ch based on species and strain
-
+                        .join(braker_ch)
                         .view()
 
         rna_aln(rna_channel) // pull species, strain, and soft-masked genome from braker_ch
@@ -342,7 +342,7 @@ process softMask {
     label 'masking'
 
     input:
-    tuple val(species), val(strain), path (asm_path)
+    tuple val(species), val(strain), path(asm_path)
 
     output:
     tuple val(species), val(strain), path("${species}/${strain}/${asm_path.baseName}_softMasked.fa"), emit: masked
@@ -360,29 +360,49 @@ process softMask {
 }
 
 process rna_aln {
-	wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
-source activate star
+	label  'star'
+    
+    publishDir(
+        path: "${params.output}",
+        mode: "copy"
+    )
 
-cd $wkdir/${GENOME%%.*}/alignments/
-STAR \
---runThreadN 24 \
---runMode genomeGenerate \
---limitGenomeGenerateRAM 600000000000 \
---genomeDir . \
---genomeFastaFiles $wkdir/$GENOME \
---genomeSAindexNbases 12 \
---alignIntronMax 10000
-STAR \
---runThreadN 24 \
---genomeDir . \
---outSAMtype BAM Unsorted SortedByCoordinate \
---twopassMode Basic \
---readFilesCommand zcat \
---alignIntronMax 10000 \
---readFilesIn $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.f.fq.gz $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.r.fq.gz
+    input: 
+    tuple val(species), valstrain), path(asm_masked), path(rna_1), path(rna_2)
+
+    output: 
+    tuple val(species), val(strain), path(asm_masked), path("............/.bam")
+    
+    script:
+    """
+    wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
+
+    source activate star
+
+    cd $wkdir/${GENOME%%.*}/alignments/
+    STAR \
+    --runThreadN 24 \
+    --runMode genomeGenerate \
+    --limitGenomeGenerateRAM 600000000000 \
+    --genomeDir . \
+    --genomeFastaFiles $wkdir/$GENOME \
+    --genomeSAindexNbases 12 \
+    --alignIntronMax 10000
+    STAR \
+    --runThreadN 24 \
+    --genomeDir . \
+    --outSAMtype BAM Unsorted SortedByCoordinate \
+    --twopassMode Basic \
+    --readFilesCommand zcat \
+    --alignIntronMax 10000 \
+    --readFilesIn $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.f.fq.gz $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.r.fq.gz
 
 
---outSAMstrandField intronMotif # needed for StringTie compatibility with BRAKER3!
+
+
+
+    --outSAMstrandField intronMotif # needed for StringTie compatibility with BRAKER3!
+    """
 }
 
 
