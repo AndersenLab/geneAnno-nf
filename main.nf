@@ -148,39 +148,17 @@ workflow {
                         .map { row -> [row.species, row.strain, row.asm_path] }
 
         softMask(mask_ch)
-	
-
-
-	// add conditional on if row.rna_seq1 and row.rna_seq2 are present
-	//	then perform braker with RNA seq
-	//	    process( STAR RNA aln ) 
-		//	also need a mode param to specify only RNA, RNA + prot, or only prot..... so maybe not column conditional
-
-
 
         braker_ch = softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
         
-        braker3(braker_ch, busco_db_lineage)
 
-        // successful_annotations = braker3.out.geneAnno
-        //     .filter { species, strain, asm_path, gff3_file ->
-        //         def success = gff3_file.size() > 100
-        //         if (!success) {
-        //             log.info "Filtering out failed sample ${species}_${strain} because braker.gff3 could not be made (most likely >100K protein prediction)"
-        //         }
-        //         return success
-        // }
-    
-        // agat_ch = successful_annotations
-        //             .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
+        // The mode the pipeline is run in determines if RNA-seq-, RNA-seq- and protein-, or just protein-guided gene model prediction is performed using BRAKER3
+        if (params.mode == "prot" || params.mode == null) {
+            println """ The 'mode' parameters was either set to 'prot' for protein-guided gene model prediction, or left unspecified. If you want to run BRAKER3 with RNA-seq gene model guiding, set 'mode' to either 'rna' or 'rna_and_prot'. """
+        braker3_prot(braker_ch, busco_db_lineage)
         
-        agat_ch = braker3.out.geneAnno
+        agat_ch = braker3_prot.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        // agat_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true) /// REMOVE - THIS WAS JUST FOR NIC
-        //                 .ifEmpty { exit 1, "Please provide a TSV sample sheet that contains: species, strain, asm_path" }
-        //                 .splitCsv(sep: "\t", header: true)
-        //                 .map { row -> [row.species, row.strain, row.asm_path, row.gff3] } 
         
         longestIso(agat_ch)
 
@@ -197,12 +175,7 @@ workflow {
 
         asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
         
-        // gff_path_ch = agat_ch.map { species, strain, asm_path, gff3 -> tuple(strain, gff3) } /// REMOVE - THIS WAS JUST FOR NIC
-
-        // gff_path_ch = successful_annotations.map { species, strain, asm_path, gff3 -> 
-        //                 def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-        //                 tuple(strain, full_path) } 
-        gff_path_ch = braker3.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+        gff_path_ch = braker3_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
                         def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
                         tuple(strain, full_path) } 
 
@@ -219,6 +192,104 @@ workflow {
                 return sample_row
             }
 
+        } else if (params.mode == "rna_and_prot") {
+        // STAR process to perform RNA alignments to the provided reference genome
+        rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
+                        .splitCsv(sep: "\t", header: true)
+                        .map { row -> 
+                        // Check if required columns exist
+                        if (!row.containsKey('rna_1') || !row.containsKey('rna_2')) {
+                            error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                        return [row.species, row.strain, row.rna_1, row.rna_2]}
+                        // left_join with braker_ch based on species and strain
+
+                        .view()
+
+        rna_aln(rna_channel) // pull species, strain, and soft-masked genome from braker_ch
+
+        braker3_rna_and_prot(braker_ch, busco_db_lineage, rna_aln.out.x)
+        
+        agat_ch = braker3_rna_and_prot.out.geneAnno
+                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+        
+        longestIso(agat_ch)
+
+        agat_output_ch = longestIso.out.longest 
+                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+
+        
+        proteome(agat_output_ch)
+
+        busco_p_ch = proteome.out.prot
+                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
+
+        busco_prot(busco_p_ch)
+
+        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+        
+        gff_path_ch = braker3_rna_and_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                        tuple(strain, full_path) } 
+
+        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+
+        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
+            .join(gff_path_ch)
+            .join(busco_stats_ch)
+            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                // Add the new columns to the sample row
+                sample_row.gff3_path = gff_path
+                sample_row.proteome_path = prot_path
+                sample_row.protein_busco = busco_prot
+                return sample_row
+            }
+        }
+
+        } else if (params.mode == "rna") {
+        // STAR process to perform RNA alignments to the provided reference genome
+        rna_channel = 
+
+        rna_aln(rna_channel)
+
+        braker3_rna_and_prot(braker_ch, busco_db_lineage, rna_aln.out.x)
+
+        braker3_rna(braker_ch, busco_db_lineage)
+        
+        agat_ch = braker3_rna.out.geneAnno
+                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+        
+        longestIso(agat_ch)
+
+        agat_output_ch = longestIso.out.longest 
+                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+
+        
+        proteome(agat_output_ch)
+
+        busco_p_ch = proteome.out.prot
+                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
+
+        busco_prot(busco_p_ch)
+
+        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+        
+        gff_path_ch = braker3_rna.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                        tuple(strain, full_path) } 
+
+        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+
+        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
+            .join(gff_path_ch)
+            .join(busco_stats_ch)
+            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                // Add the new columns to the sample row
+                sample_row.gff3_path = gff_path
+                sample_row.proteome_path = prot_path
+                sample_row.protein_busco = busco_prot
+                return sample_row
+            }
+        }
 
         final_table = combined_ch
             .collect()  // This ensures all data is gathered before processing
@@ -288,7 +359,6 @@ process softMask {
 
 }
 
-
 process rna_aln {
 	wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
 source activate star
@@ -316,9 +386,60 @@ STAR \
 }
 
 
+process braker3_rna {
 
+    publishDir(
+        path: "${params.output}",
+        mode: 'copy',
+        pattern: "**/*.gff3",
+    )
+    
+    label 'braker'
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    beforeScript 'module load singularity'
 
-process braker3 {
+    input:
+    tuple val(species), val(strain), path(asm_masked)
+    path(busco_db_lineage)
+
+    output:
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
+
+    script:
+    """    
+    mkdir -p ${species}/${strain}/augustus_config 
+    mkdir -p ${species}/${strain}/braker/output
+
+    # -L flag to follow symlinks and copy actual content
+    cp -rL ${busco_db_lineage} ${species}/${strain}/braker/output/
+    #ls -la ${species}/${strain}/braker/output/mb_downloads/
+
+    # Copy Augustus config (inside the container... nextflow handles this)
+    cp -r /opt/Augustus/config/* ${species}/${strain}/augustus_config/
+    
+    # Adjust permissions
+    chmod -R u+w ${species}/${strain}/augustus_config
+
+    # Set environment variable so braker knows where to find the augustus config folder
+    export AUGUSTUS_CONFIG_PATH=\$PWD/${species}/${strain}/augustus_config
+
+    # Run BRAKER3
+    braker.pl \
+        --genome ${asm_masked} \
+        --species ${species}_${strain} \
+        --prot_seq ${braker_proteome} \
+        --threads ${task.cpus} \
+        --busco_lineage=nematoda_odb10 \
+        --gff3 \
+        --workingdir ${species}/${strain}/braker/output 
+
+    # Renaming "braker.gff3" that is produced:
+    mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
+
+    """
+}
+
+process braker3_rna_prot {
 
     publishDir(
         path: "${params.output}",
@@ -372,70 +493,58 @@ process braker3 {
 }
 
 
-// process braker3 { // rename to "braker3_unmasked"
+process braker3_prot {
 
-//     publishDir(
-//         path: "${params.output}",
-//         mode: 'copy',
-//         pattern: "**/*.gff3",
-//     )
+    publishDir(
+        path: "${params.output}",
+        mode: 'copy',
+        pattern: "**/*.gff3",
+    )
     
-//     label 'braker'
-//     container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-//     beforeScript 'module load singularity'
-//     errorStrategy 'ignore'  // Continue pipeline even if some samples fail
+    label 'braker'
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    beforeScript 'module load singularity'
 
-//     input:
-//     tuple val(species), val(strain), path(asm_path)
-//     path(busco_db_lineage)
+    input:
+    tuple val(species), val(strain), path(asm_masked)
+    path(busco_db_lineage)
 
-//     output:
-//     tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/braker/output/${strain}.braker*.gff3"), emit: geneAnno, optional: true
+    output:
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
 
-//     script:
-//     """    
-//     mkdir -p ${species}/${strain}/augustus_config 
-//     mkdir -p ${species}/${strain}/braker/output
+    script:
+    """    
+    mkdir -p ${species}/${strain}/augustus_config 
+    mkdir -p ${species}/${strain}/braker/output
 
-//     # -L flag to follow symlinks and copy actual content
-//     cp -rL ${busco_db_lineage} ${species}/${strain}/braker/output/
-//     #ls -la ${species}/${strain}/braker/output/mb_downloads/
+    # -L flag to follow symlinks and copy actual content
+    cp -rL ${busco_db_lineage} ${species}/${strain}/braker/output/
+    #ls -la ${species}/${strain}/braker/output/mb_downloads/
 
-//     # Copy Augustus config (inside the container... nextflow handles this)
-//     cp -r /opt/Augustus/config/* ${species}/${strain}/augustus_config/
+    # Copy Augustus config (inside the container... nextflow handles this)
+    cp -r /opt/Augustus/config/* ${species}/${strain}/augustus_config/
     
-//     # Adjust permissions
-//     chmod -R u+w ${species}/${strain}/augustus_config
+    # Adjust permissions
+    chmod -R u+w ${species}/${strain}/augustus_config
 
-//     # Set environment variable so braker knows where to find the augustus config folder
-//     export AUGUSTUS_CONFIG_PATH=\$PWD/${species}/${strain}/augustus_config
+    # Set environment variable so braker knows where to find the augustus config folder
+    export AUGUSTUS_CONFIG_PATH=\$PWD/${species}/${strain}/augustus_config
 
-//     # Run BRAKER3
-//     braker.pl \
-//         --genome ${asm_path} \
-//         --species ${species}_${strain} \
-//         --prot_seq ${braker_proteome} \
-//         --threads ${task.cpus} \
-//         --busco_lineage=nematoda_odb10 \
-//         --gff3 \
-//         --workingdir ${species}/${strain}/braker/output && BRAKER_SUCCESS=true || BRAKER_SUCCESS=false
+    # Run BRAKER3
+    braker.pl \
+        --genome ${asm_masked} \
+        --species ${species}_${strain} \
+        --prot_seq ${braker_proteome} \
+        --threads ${task.cpus} \
+        --busco_lineage=nematoda_odb10 \
+        --gff3 \
+        --workingdir ${species}/${strain}/braker/output 
 
-//     # Handle output based on success/failure
-//     if [ "\$BRAKER_SUCCESS" = "true" ] && [ -f "${species}/${strain}/braker/output/braker.gff3" ] && [ -s "${species}/${strain}/braker/output/braker.gff3" ]; then
-//         mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.braker.gff3
-//     else
-//         echo "BRAKER failed for ${species}_${strain} (likely >100K protein issue)"
-//         touch ${species}/${strain}/braker/output/${strain}.braker.EMPTY.gff3
-//     fi
+    # Renaming "braker.gff3" that is produced:
+    mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
 
-//     # Always exit successfully to prevent Nextflow task failure
-//     exit 0
-
-//     # Renaming "braker.gff3" that is produced:
-//     #mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.braker.gff3
-
-//     """
-// }
+    """
+}
 
 
 process longestIso {
