@@ -146,25 +146,8 @@ workflow {
         
         braker3(braker_ch, busco_db_lineage)
 
-        // successful_annotations = braker3.out.geneAnno
-        //     .filter { species, strain, asm_path, gff3_file ->
-        //         def success = gff3_file.size() > 100
-        //         if (!success) {
-        //             log.info "Filtering out failed sample ${species}_${strain} because braker.gff3 could not be made (most likely >100K protein prediction)"
-        //         }
-        //         return success
-        // }
-    
-        // agat_ch = successful_annotations
-        //             .map { species, strain, asm_path, gff3 -> tuple(species, strain, asm_path, gff3) }
-        
         agat_ch = braker3.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        // agat_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true) /// REMOVE - THIS WAS JUST FOR NIC
-        //                 .ifEmpty { exit 1, "Please provide a TSV sample sheet that contains: species, strain, asm_path" }
-        //                 .splitCsv(sep: "\t", header: true)
-        //                 .map { row -> [row.species, row.strain, row.asm_path, row.gff3] } 
         
         longestIso(agat_ch)
 
@@ -181,11 +164,6 @@ workflow {
 
         asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
         
-        // gff_path_ch = agat_ch.map { species, strain, asm_path, gff3 -> tuple(strain, gff3) } /// REMOVE - THIS WAS JUST FOR NIC
-
-        // gff_path_ch = successful_annotations.map { species, strain, asm_path, gff3 -> 
-        //                 def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-        //                 tuple(strain, full_path) } 
         gff_path_ch = braker3.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
                         def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
                         tuple(strain, full_path) } 
