@@ -195,28 +195,26 @@ workflow {
         } else if (params.mode == "rna_and_prot") {
         // Transform braker_ch to use tuple key for joining on both species AND strain
         braker_ch_keyed = braker_ch.map { species, strain, asm_masked -> 
-            [tuple(species, strain), asm_masked] }
+            [[species, strain], asm_masked] }
         
-        // STAR process to perform RNA alignments to the provided reference genome
+        // RNA alignment channel 
         rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> 
                         // Check if required columns exist for RNA-guided gene model prediction
-                        if (!row.containsKey('rna_1') || !row.containsKey('rna_2')) {
-                            error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
-                        return [row.species, row.strain, row.rna_1, row.rna_2]}
+                        if (!row.containsKey('bam')) {
+                            error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                        return [[row.species, row.strain], row.bam]}
                         // left_join with braker_ch based on species and strain
                         .join(braker_ch_keyed)// Inner join on [species, strain] tuple
-                        .map { key, rna_1, rna_2, asm_masked ->
-                            // Flatten back to: [species, strain, rna_1, rna_2, asm_masked]
-                            [key[0], key[1], rna_1, rna_2, asm_masked] }
+                        .map { key, bam, asm_masked ->
+                            // Flatten back to: [species, strain, bam, asm_masked]
+                            [key[0], key[1], bam, asm_masked] }
                         .view()
 
-        rna_aln(rna_channel) 
-
-        braker3_rna_and_prot(rna_aln.out.aligned, busco_db_lineage)
+        braker3_rna_prot(rna_channel, busco_db_lineage)
         
-        agat_ch = braker3_rna_and_prot.out.geneAnno
+        agat_ch = braker3_rna_prot.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
         
         longestIso(agat_ch)
@@ -234,7 +232,7 @@ workflow {
 
         asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
         
-        gff_path_ch = braker3_rna_and_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+        gff_path_ch = braker3_rna_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
                         def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
                         tuple(strain, full_path) } 
 
@@ -250,27 +248,23 @@ workflow {
                 sample_row.protein_busco = busco_prot
                 return sample_row
             }
-        }
-
         } else if (params.mode == "rna") {
         // STAR process to perform RNA alignments to the provided reference genome
         rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> 
                         // Check if required columns exist for RNA-guided gene model prediction
-                        if (!row.containsKey('rna_1') || !row.containsKey('rna_2')) {
-                            error "Columns 'rna_1' and 'rna_2' must be present in the provided sample_sheet when running mode rna or rna_prot"}
-                        return [row.species, row.strain, row.rna_1, row.rna_2]}
+                        if (!row.containsKey('bam')) {
+                            error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                        return [row.species, row.strain, row.bam]}
                         // left_join with braker_ch based on species and strain
                         .join(braker_ch_keyed)// Inner join on [species, strain] tuple
-                        .map { key, rna_1, rna_2, asm_masked ->
-                            // Flatten back to: [species, strain, rna_1, rna_2, asm_masked]
-                            [key[0], key[1], rna_1, rna_2, asm_masked] }
+                        .map { key, bam, asm_masked ->
+                            // Flatten back to: [species, strain, bam, asm_masked]
+                            [key[0], key[1], bam, asm_masked] }
                         .view()
 
-        rna_aln(rna_channel) 
-
-        braker3_rna(rna_aln.out.aligned, busco_db_lineage)
+        braker3_rna(rna_channel, busco_db_lineage)
         
         agat_ch = braker3_rna.out.geneAnno
                     .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
@@ -376,53 +370,6 @@ process softMask {
 
 }
 
-process rna_aln {
-	label  'star'
-    
-    publishDir(
-        path: "${params.output}",
-        mode: "copy"
-    )
-
-    input: 
-    tuple val(species), valstrain), path(asm_masked), path(rna_1), path(rna_2)
-
-    output: 
-    tuple val(species), val(strain), path(asm_masked), path("............/.bam"), emit: aligned
-    
-    script:
-    """
-    wkdir="/projects/b1059/projects/Nicolas/c.briggsae/gene_predictions"
-
-    source activate star
-
-    cd $wkdir/${GENOME%%.*}/alignments/
-    STAR \
-    --runThreadN 24 \
-    --runMode genomeGenerate \
-    --limitGenomeGenerateRAM 600000000000 \
-    --genomeDir . \
-    --genomeFastaFiles $wkdir/$GENOME \
-    --genomeSAindexNbases 12 \
-    --alignIntronMax 10000
-    STAR \
-    --runThreadN 24 \
-    --genomeDir . \
-    --outSAMtype BAM Unsorted SortedByCoordinate \
-    --twopassMode Basic \
-    --readFilesCommand zcat \
-    --alignIntronMax 10000 \
-    --readFilesIn $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.f.fq.gz $wkdir/shortreads/${GENOME%%.*}/${GENOME%%.*}.reads.r.fq.gz
-
-
-
-
-
-    --outSAMstrandField intronMotif # needed for StringTie compatibility with BRAKER3!
-    """
-}
-
-
 process braker3_rna {
 
     publishDir(
@@ -436,7 +383,7 @@ process braker3_rna {
     beforeScript 'module load singularity'
 
     input:
-    tuple val(species), val(strain), path(asm_masked)
+    tuple val(species), val(strain), path(bam), path(asm_masked)
     path(busco_db_lineage)
 
     output:
@@ -464,9 +411,8 @@ process braker3_rna {
     braker.pl \
         --genome ${asm_masked} \
         --species ${species}_${strain} \
-        --prot_seq ${braker_proteome} \
+        --bam ${bam} \
         --threads ${task.cpus} \
-        --busco_lineage=nematoda_odb10 \
         --gff3 \
         --workingdir ${species}/${strain}/braker/output 
 
@@ -489,7 +435,7 @@ process braker3_rna_prot {
     beforeScript 'module load singularity'
 
     input:
-    tuple val(species), val(strain), path(asm_masked)
+    tuple val(species), val(strain), path(bam), path(asm_masked)
     path(busco_db_lineage)
 
     output:
@@ -519,9 +465,9 @@ process braker3_rna_prot {
         --species ${species}_${strain} \
         --prot_seq ${braker_proteome} \
         --threads ${task.cpus} \
-        --busco_lineage=nematoda_odb10 \
         --gff3 \
-        --workingdir ${species}/${strain}/braker/output 
+        --workingdir ${species}/${strain}/braker/output \
+        --bam ${bam}
 
     # Renaming "braker.gff3" that is produced:
     mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
