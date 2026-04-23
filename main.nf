@@ -89,15 +89,6 @@ if (!braker_proteome) {
     Please provide a valid species to --species parameters. Either 'c_elegans', 'c_tropicalis', 'c_briggsae', or 'c_nigoni'.
     """ }
 
-// def rna_seq_map = ["c_briggsae": ""]
-
-// def braker_rna_seq = rna_seq_map[params.species]
-
-// if (!braker_rna_seq) {
-//     error """
-//     As of right now, only species "c_briggsae" is compatible with this version of main.nf which incorporates CGC2 SR RNA-seq to help guide gene model prediction
-//     """}
-
 // Which fasta to use for masking
 def mask_map= [
     "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
