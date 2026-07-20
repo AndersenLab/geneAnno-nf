@@ -211,7 +211,7 @@ workflow {
 process busco_download {
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -260,7 +260,7 @@ process braker3 {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -303,72 +303,6 @@ process braker3 {
 
     """
 }
-
-
-// process braker3 { // rename to "braker3_unmasked"
-
-//     publishDir(
-//         path: "${params.output}",
-//         mode: 'copy',
-//         pattern: "**/*.gff3",
-//     )
-    
-//     label 'braker'
-//     container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-//     beforeScript 'module load singularity'
-//     errorStrategy 'ignore'  // Continue pipeline even if some samples fail
-
-//     input:
-//     tuple val(species), val(strain), path(asm_path)
-//     path(busco_db_lineage)
-
-//     output:
-//     tuple val(species), val(strain), path(asm_path), path("${species}/${strain}/braker/output/${strain}.braker*.gff3"), emit: geneAnno, optional: true
-
-//     script:
-//     """    
-//     mkdir -p ${species}/${strain}/augustus_config 
-//     mkdir -p ${species}/${strain}/braker/output
-
-//     # -L flag to follow symlinks and copy actual content
-//     cp -rL ${busco_db_lineage} ${species}/${strain}/braker/output/
-//     #ls -la ${species}/${strain}/braker/output/mb_downloads/
-
-//     # Copy Augustus config (inside the container... nextflow handles this)
-//     cp -r /opt/Augustus/config/* ${species}/${strain}/augustus_config/
-    
-//     # Adjust permissions
-//     chmod -R u+w ${species}/${strain}/augustus_config
-
-//     # Set environment variable so braker knows where to find the augustus config folder
-//     export AUGUSTUS_CONFIG_PATH=\$PWD/${species}/${strain}/augustus_config
-
-//     # Run BRAKER3
-//     braker.pl \
-//         --genome ${asm_path} \
-//         --species ${species}_${strain} \
-//         --prot_seq ${braker_proteome} \
-//         --threads ${task.cpus} \
-//         --busco_lineage=nematoda_odb10 \
-//         --gff3 \
-//         --workingdir ${species}/${strain}/braker/output && BRAKER_SUCCESS=true || BRAKER_SUCCESS=false
-
-//     # Handle output based on success/failure
-//     if [ "\$BRAKER_SUCCESS" = "true" ] && [ -f "${species}/${strain}/braker/output/braker.gff3" ] && [ -s "${species}/${strain}/braker/output/braker.gff3" ]; then
-//         mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.braker.gff3
-//     else
-//         echo "BRAKER failed for ${species}_${strain} (likely >100K protein issue)"
-//         touch ${species}/${strain}/braker/output/${strain}.braker.EMPTY.gff3
-//     fi
-
-//     # Always exit successfully to prevent Nextflow task failure
-//     exit 0
-
-//     # Renaming "braker.gff3" that is produced:
-//     #mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.braker.gff3
-
-//     """
-// }
 
 
 process longestIso {
