@@ -76,26 +76,27 @@ if (params.debug) {
 
 
 // Which proteome BRAKER3 should use
-def proteome_map = [
-    "c_elegans": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_tropicalis": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_briggsae": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/CBCE_mixed_custom_library.prot.fa",
-    "c_nigoni": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa" ]
+//def proteome_map = [
+//    "c_elegans": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
+//    "c_tropicalis": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
+//    "c_briggsae": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/CBCE_mixed_custom_library.prot.fa",
+//    "c_nigoni": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa" ]
 
-def braker_proteome = proteome_map[params.species]
+def braker_proteome = "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa"  // proteome_map[params.species]
+println """The proteome used for gene model guiding is $braker_proteome"""
 
-if (!braker_proteome) {
-    error """
-    Please provide a valid species to --species parameters. Either 'c_elegans', 'c_tropicalis', 'c_briggsae', or 'c_nigoni'.
-    """ }
+//if (!braker_proteome) {
+//    error """
+//    Please provide a valid species to --species parameters. Either 'c_elegans', 'c_tropicalis', 'c_briggsae', or 'c_nigoni'.
+//    """ }
 
 // Which fasta to use for masking
-def mask_map= [
-    "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
-    "c_tropicalis": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
-    "c_briggsae": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
+//def mask_map= [
+  //  "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
+  //  "c_tropicalis": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
+  //  "c_briggsae": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
 
-def mask_file = mask_map[params.species]
+// def mask_file = mask_map[params.species]
 
 
 def log_summary() {
@@ -126,170 +127,169 @@ workflow {
                         .ifEmpty { exit 1, "Please provide a TSV sample sheet that contains: species, strain, asm_path" }
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> [row.species, row.strain, row.asm_path] } 
-        braker3(braker_ch, busco_db_lineage)
+        braker3_prot(braker_ch, busco_db_lineage)
 
     } else if (params.source == "default") {
-                                                                                                                                                    //////////////////////////////// NEED TO ADD IFELSE STATMENT FOR NIGONI - WHICH DOES NOT HAVE A MASK FILE.... execute unmasked braker3 version and the "successful_annotations" channel
+                                                                                                                                                    
         busco_download() 
         busco_db_lineage = busco_download.out
 
-        mask_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)
-                        .ifEmpty { exit 1, "Please provide the filtered assemlby stats sheet output from assembly-nf" }
+        // mask_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)                                             //////////////////////////////// NEED TO ADD A MASKING PROCESS TO THE FINAL ASSEMBLIES FOR GENE MODEL PREDICTION
+        //                .ifEmpty { exit 1, "Please provide the filtered assemlby stats sheet output from assembly-nf" }. 
+        //                .splitCsv(sep: "\t", header: true)
+        //                .map { row -> [row.species, row.strain, row.asm_path] }
+
+        // softMask(mask_ch) //////////////////////////// I NEED TO ADD THIS PROCESS!!!!!!!!!
+
+        braker_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)
+                        .ifEmpty { exit 1, "Please provide a properly formatted sample sheet"}   //softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
                         .splitCsv(sep: "\t", header: true)
                         .map { row -> [row.species, row.strain, row.asm_path] }
-
-        softMask(mask_ch)
-
-        braker_ch = softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
-        
 
         // The mode the pipeline is run in determines if RNA-seq-, RNA-seq- and protein-, or just protein-guided gene model prediction is performed using BRAKER3
         if (params.mode == "prot" || params.mode == null) {
             println """ The 'mode' parameters was either set to 'prot' for protein-guided gene model prediction, or left unspecified. If you want to run BRAKER3 with RNA-seq gene model guiding, set 'mode' to either 'rna' or 'rna_and_prot'. """
-        braker3_prot(braker_ch, busco_db_lineage)
-        
-        agat_ch = braker3_prot.out.geneAnno
-                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        longestIso(agat_ch)
+            braker3_prot(braker_ch, busco_db_lineage)
+            
+            agat_ch = braker3_prot.out.geneAnno
+                        .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            
+            longestIso(agat_ch)
 
-        agat_output_ch = longestIso.out.longest 
-                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            agat_output_ch = longestIso.out.longest 
+                                .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
 
-        
-        proteome(agat_output_ch)
+            
+            proteome(agat_output_ch)
 
-        busco_p_ch = proteome.out.prot
-                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
+            busco_p_ch = proteome.out.prot
+                            .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
 
-        busco_prot(busco_p_ch)
+            busco_prot(busco_p_ch)
 
-        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
-        
-        gff_path_ch = braker3_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
-                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-                        tuple(strain, full_path) } 
+            asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+            
+            gff_path_ch = braker3_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                            def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                            tuple(strain, full_path) } 
 
-        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+            busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
 
-        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
-            .join(gff_path_ch)
-            .join(busco_stats_ch)
-            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
-                // Add the new columns to the sample row
-                sample_row.gff3_path = gff_path
-                sample_row.proteome_path = prot_path
-                sample_row.protein_busco = busco_prot
-                return sample_row
-            }
+            combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
+                .join(gff_path_ch)
+                .join(busco_stats_ch)
+                .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                    // Add the new columns to the sample row
+                    sample_row.gff3_path = gff_path
+                    sample_row.proteome_path = prot_path
+                    sample_row.protein_busco = busco_prot
+                    return sample_row }
 
         } else if (params.mode == "rna_and_prot") {
         // Transform braker_ch to use tuple key for joining on both species AND strain
-        braker_ch_keyed = braker_ch.map { species, strain, asm_masked -> 
-            [[species, strain], asm_masked] }
-        
-        // RNA alignment channel 
-        rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
-                        .splitCsv(sep: "\t", header: true)
-                        .map { row -> 
-                        // Check if required columns exist for RNA-guided gene model prediction
-                        if (!row.containsKey('bam')) {
-                            error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
-                        return [[row.species, row.strain], row.bam]}
-                        // left_join with braker_ch based on species and strain
-                        .join(braker_ch_keyed)// Inner join on [species, strain] tuple
-                        .map { key, bam, asm_masked ->
-                            // Flatten back to: [species, strain, bam, asm_masked]
-                            [key[0], key[1], bam, asm_masked] }
-                        .view()
+            braker_ch_keyed = braker_ch.map { species, strain, asm_masked -> 
+                [[species, strain], asm_masked] }
+            
+            // RNA alignment channel 
+            rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
+                            .splitCsv(sep: "\t", header: true)
+                            .map { row -> 
+                            // Check if required columns exist for RNA-guided gene model prediction
+                            if (!row.containsKey('bam')) {
+                                error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                            return [[row.species, row.strain], row.bam]}
+                            // left_join with braker_ch based on species and strain
+                            .join(braker_ch_keyed)// Inner join on [species, strain] tuple
+                            .map { key, bam, asm_masked ->
+                                // Flatten back to: [species, strain, bam, asm_masked]
+                                [key[0], key[1], bam, asm_masked] }
+                            .view()
 
-        braker3_rna_prot(rna_channel, busco_db_lineage)
-        
-        agat_ch = braker3_rna_prot.out.geneAnno
-                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        longestIso(agat_ch)
+            braker3_rna_prot(rna_channel, busco_db_lineage)
+            
+            agat_ch = braker3_rna_prot.out.geneAnno
+                        .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            
+            longestIso(agat_ch)
 
-        agat_output_ch = longestIso.out.longest 
-                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            agat_output_ch = longestIso.out.longest 
+                                .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
 
-        
-        proteome(agat_output_ch)
+            
+            proteome(agat_output_ch)
 
-        busco_p_ch = proteome.out.prot
-                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
+            busco_p_ch = proteome.out.prot
+                            .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
 
-        busco_prot(busco_p_ch)
+            busco_prot(busco_p_ch)
 
-        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
-        
-        gff_path_ch = braker3_rna_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
-                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-                        tuple(strain, full_path) } 
+            asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+            
+            gff_path_ch = braker3_rna_prot.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                            def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                            tuple(strain, full_path) } 
 
-        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+            busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
 
-        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
-            .join(gff_path_ch)
-            .join(busco_stats_ch)
-            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
-                // Add the new columns to the sample row
-                sample_row.gff3_path = gff_path
-                sample_row.proteome_path = prot_path
-                sample_row.protein_busco = busco_prot
-                return sample_row
-            }
+            combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
+                .join(gff_path_ch)
+                .join(busco_stats_ch)
+                .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                    // Add the new columns to the sample row
+                    sample_row.gff3_path = gff_path
+                    sample_row.proteome_path = prot_path
+                    sample_row.protein_busco = busco_prot
+                    return sample_row }
         } else if (params.mode == "rna") {
         // STAR process to perform RNA alignments to the provided reference genome
-        rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
-                        .splitCsv(sep: "\t", header: true)
-                        .map { row -> 
-                        // Check if required columns exist for RNA-guided gene model prediction
-                        if (!row.containsKey('bam')) {
-                            error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
-                        return [row.species, row.strain, row.bam]}
-                        // left_join with braker_ch based on species and strain
-                        .join(braker_ch_keyed)// Inner join on [species, strain] tuple
-                        .map { key, bam, asm_masked ->
-                            // Flatten back to: [species, strain, bam, asm_masked]
-                            [key[0], key[1], bam, asm_masked] }
-                        .view()
+            rna_channel = Channel.fromPath(params.sample_sheet, checkIfExists: true)
+                            .splitCsv(sep: "\t", header: true)
+                            .map { row -> 
+                            // Check if required columns exist for RNA-guided gene model prediction
+                            if (!row.containsKey('bam')) {
+                                error "Column 'bam' must be present in the provided sample_sheet when running mode rna or rna_prot"}
+                            return [row.species, row.strain, row.bam]}
+                            // left_join with braker_ch based on species and strain
+                            .join(braker_ch_keyed)// Inner join on [species, strain] tuple
+                            .map { key, bam, asm_masked ->
+                                // Flatten back to: [species, strain, bam, asm_masked]
+                                [key[0], key[1], bam, asm_masked] }
+                            .view()
 
-        braker3_rna(rna_channel, busco_db_lineage)
-        
-        agat_ch = braker3_rna.out.geneAnno
-                    .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        longestIso(agat_ch)
+            braker3_rna(rna_channel, busco_db_lineage)
+            
+            agat_ch = braker3_rna.out.geneAnno
+                        .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            
+            longestIso(agat_ch)
 
-        agat_output_ch = longestIso.out.longest 
-                            .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-        
-        proteome(agat_output_ch)
+            agat_output_ch = longestIso.out.longest 
+                                .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
+            
+            proteome(agat_output_ch)
 
-        busco_p_ch = proteome.out.prot
-                        .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
+            busco_p_ch = proteome.out.prot
+                            .map { species, strain, asm_masked, prot_path -> tuple(species, strain, prot_path) }
 
-        busco_prot(busco_p_ch)
+            busco_prot(busco_p_ch)
 
-        asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
-        
-        gff_path_ch = braker3_rna.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
-                        def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
-                        tuple(strain, full_path) } 
+            asm_filt_table_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true).splitCsv(sep: "\t", header: true)
+            
+            gff_path_ch = braker3_rna.out.geneAnno.map { species, strain, asm_masked, gff3 -> 
+                            def full_path = "${workflow.launchDir}/${params.output}/${species}/${strain}/braker/output/${gff3.name}" // name removes the full path and keeps only the file name - gff3 is stored in a cached directory in /scratch4 so we want to remove this 
+                            tuple(strain, full_path) } 
 
-        busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
+            busco_stats_ch = busco_prot.out.buscoStat.map { species, strain, stats_file, _ -> file(stats_file) }.collectFile(name: "all_busco_scores.tsv", keepHeader: true, skip: 1).splitCsv(sep: "\t", header: true).map { row -> tuple(row.strain, row.busco_completeness_protein, row.proteome_path) }
 
-        combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
-            .join(gff_path_ch)
-            .join(busco_stats_ch)
-            .map { strain, sample_row, gff_path, busco_prot, prot_path ->
-                // Add the new columns to the sample row
-                sample_row.gff3_path = gff_path
-                sample_row.proteome_path = prot_path
-                sample_row.protein_busco = busco_prot
-                return sample_row
-            }
+            combined_ch = asm_filt_table_ch.map { row -> tuple(row.strain, row) }  // the second value in the tuple, row, contains the entire row: [strain [entire_row]]
+                .join(gff_path_ch)
+                .join(busco_stats_ch)
+                .map { strain, sample_row, gff_path, busco_prot, prot_path ->
+                    // Add the new columns to the sample row
+                    sample_row.gff3_path = gff_path
+                    sample_row.proteome_path = prot_path
+                    sample_row.protein_busco = busco_prot
+                    return sample_row }
         }
 
         final_table = combined_ch
@@ -483,7 +483,8 @@ process braker3_prot {
     path(busco_db_lineage)
 
     output:
-    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
+    // tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3"), emit: geneAnno
+    tuple val(species), val(strain), path(asm_masked), path("${species}/${strain}/braker/output/${strain}.braker.gff3"), emit: geneAnno
 
     script:
     """    
@@ -514,7 +515,7 @@ process braker3_prot {
         --workingdir ${species}/${strain}/braker/output 
 
     # Renaming "braker.gff3" that is produced:
-    mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.softMasked.braker.gff3
+    mv ${species}/${strain}/braker/output/braker.gff3 ${species}/${strain}/braker/output/${strain}.braker.gff3
 
     """
 }
