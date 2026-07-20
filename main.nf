@@ -144,7 +144,7 @@ workflow {
         braker_ch = Channel.fromPath(params.sample_sheet, checkIfExists: true)
                         .ifEmpty { exit 1, "Please provide a properly formatted sample sheet"}   //softMask.out.masked.map { species, strain, asm_masked -> tuple(species, strain, asm_masked) }
                         .splitCsv(sep: "\t", header: true)
-                        .map { row -> [row.species, row.strain, row.asm_path] }
+                        .map { row -> [row.species, row.strain, row.asm_path] }.view()
 
         // The mode the pipeline is run in determines if RNA-seq-, RNA-seq- and protein-, or just protein-guided gene model prediction is performed using BRAKER3
         if (params.mode == "prot" || params.mode == null) {
@@ -320,7 +320,8 @@ workflow {
 process busco_download {
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -369,7 +370,8 @@ process braker3_rna {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -421,7 +423,8 @@ process braker3_rna_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -475,7 +478,8 @@ process braker3_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    // container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:

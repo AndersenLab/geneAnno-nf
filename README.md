@@ -12,7 +12,7 @@ This is a nextflow process that predicts gene models in *Caenorhabditis de novo*
 ```
 This Nextflow process is meant to be run after [assembly-nf](https://github.com/AndersenLab/assembly-nf), and it will add full paths to files produced and busco protein stats directly to the stats sheet output from assembly-nf.
 
-## This branch (`CGC2_geneAnno`) incorporates options for the external data that is provided to BRAKER3 for guiding gene models. See the `--mode` parameter below.  
+## This branch (`parasite_genomes`) is specifically meant for predicting gene models in parasitic nematodes.  
 
 ## --source
 The parameter ```--source``` can be equal to "only-braker" or "default". If ```--source``` is set to "only-braker", then only BRAKER3 will run. Otherwise, if ```--source``` is equal to "default", then the entire workflow will run, which is inclusive of BRAKER3, agat for extracting the longest isoform of each gene model prediction, gffread for creating a proteome from the longest isoform GFF and the supplied genome, BUSCO on the created proteome, and then gathering all paths and stats and adding to the supplied ```--sample_sheet```.
