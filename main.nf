@@ -264,7 +264,6 @@ workflow {
 
         agat_output_ch = longestIso.out.longest 
                             .map { species, strain, asm_masked, gff3 -> tuple(species, strain, asm_masked, gff3) }
-
         
         proteome(agat_output_ch)
 
