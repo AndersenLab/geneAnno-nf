@@ -320,7 +320,7 @@ workflow {
 process busco_download {
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -369,7 +369,7 @@ process braker3_rna {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -421,7 +421,7 @@ process braker3_rna_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -475,7 +475,7 @@ process braker3_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
