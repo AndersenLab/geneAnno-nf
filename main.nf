@@ -219,7 +219,7 @@ process busco_download {
 
     script:
     """
-    /opt/compleasm_kit/compleasm.py download nematoda_odb10
+    /opt/compleasm_kit/compleasm.py download nematoda_odb10 --odb 10
 
     """
 }
