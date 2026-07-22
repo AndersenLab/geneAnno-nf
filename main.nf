@@ -320,8 +320,7 @@ workflow {
 process busco_download {
     
     label 'braker'
-    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -329,7 +328,7 @@ process busco_download {
 
     script:
     """
-    /opt/compleasm_kit/compleasm.py download nematoda_odb10 --odb odb10
+    /opt/compleasm_kit/compleasm.py download nematoda_odb12 --odb odb12
 
     """
 }
@@ -370,8 +369,7 @@ process braker3_rna {
     )
     
     label 'braker'
-    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -423,8 +421,7 @@ process braker3_rna_prot {
     )
     
     label 'braker'
-    //container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -478,8 +475,7 @@ process braker3_prot {
     )
     
     label 'braker'
-    // container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20250724.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -514,7 +510,7 @@ process braker3_prot {
         --species ${species}_${strain} \
         --prot_seq ${braker_proteome} \
         --threads ${task.cpus} \
-        --busco_lineage=nematoda_odb10 \
+        --busco_lineage=nematoda_odb12 \
         --gff3 \
         --workingdir ${species}/${strain}/braker/output 
 
