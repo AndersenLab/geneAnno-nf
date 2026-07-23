@@ -211,7 +211,7 @@ workflow {
 process busco_download {
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -260,7 +260,7 @@ process braker3 {
     )
     
     label 'braker'
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
