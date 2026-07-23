@@ -320,7 +320,8 @@ workflow {
 process busco_download {
     
     label 'braker'
-    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -369,7 +370,8 @@ process braker3_rna {
     )
     
     label 'braker'
-    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -421,7 +423,8 @@ process braker3_rna_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    // container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -475,7 +478,8 @@ process braker3_prot {
     )
     
     label 'braker'
-    container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
+    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -585,16 +589,16 @@ process busco_prot {
     tuple val(species), val(strain), path(prot_path)
 
     output:
-    tuple val(species), val(strain), path("${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv"), path("${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb10.${prot_path.baseName}.busco.txt"), emit: buscoStat
+    tuple val(species), val(strain), path("${species}/${strain}/busco/${prot_path.baseName}.busco/${prot_path.baseName}.busco.stat.tsv"), path("${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt"), emit: buscoStat
 
     script:
     """
     mkdir -p ${species}/${strain}/busco
 
-    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/elegans/busco_downloads/lineages/nematoda_odb10/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/elegans/busco_downloads/lineages/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
     echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
-    grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb10.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
+    grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
     awk '{ match(\$0, /C:([0-9.]+)%/, a); print a[1] }' ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv 
     paste -d '\t' <(echo "$strain") ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv <(echo "${workflow.launchDir}/${params.output}/${species}/${strain}/protein/${prot_path.baseName}.fa") > strain_busco.tsv
     
