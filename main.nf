@@ -75,29 +75,8 @@ if (params.debug) {
 }
 
 
-// Which proteome BRAKER3 should use
-//def proteome_map = [
-//    "c_elegans": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-//    "c_tropicalis": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-//    "c_briggsae": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/CBCE_mixed_custom_library.prot.fa",
-//    "c_nigoni": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa" ]
-
-def braker_proteome = "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa"  // proteome_map[params.species]
+def braker_proteome = "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/Eukaryota.fa"  // proteome_map[params.species]
 println """The proteome used for gene model guiding is $braker_proteome"""
-
-//if (!braker_proteome) {
-//    error """
-//    Please provide a valid species to --species parameters. Either 'c_elegans', 'c_tropicalis', 'c_briggsae', or 'c_nigoni'.
-//    """ }
-
-// Which fasta to use for masking
-//def mask_map= [
-  //  "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
-  //  "c_tropicalis": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
-  //  "c_briggsae": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
-
-// def mask_file = mask_map[params.species]
-
 
 def log_summary() {
     // Corrected log summary function to print information instead of recursive call
@@ -320,8 +299,7 @@ workflow {
 process busco_download {
     
     label 'braker'
-    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     output:
@@ -370,8 +348,7 @@ process braker3_rna {
     )
     
     label 'braker'
-    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -424,7 +401,7 @@ process braker3_rna_prot {
     
     label 'braker'
     // container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -478,8 +455,7 @@ process braker3_prot {
     )
     
     label 'braker'
-    //container "/vast/eande106/singularity/loconn13999-braker3_20260720.sif"
-    container "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/container_images/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
+    container "/vast/eande106/singularity/loconn13999-BRAKER3_buscoVersionFix_20260723.sif"
     beforeScript 'module load singularity'
 
     input:
@@ -595,7 +571,7 @@ process busco_prot {
     """
     mkdir -p ${species}/${strain}/busco
 
-    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/elegans/busco_downloads/lineages/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/busco_lineages/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
     echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
     grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
