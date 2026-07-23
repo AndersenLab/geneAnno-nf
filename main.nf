@@ -77,10 +77,10 @@ if (params.debug) {
 
 // Which proteome BRAKER3 should use
 def proteome_map = [
-    "c_elegans": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_tropicalis": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_briggsae": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/CBCE_mixed_custom_library.prot.fa",
-    "c_nigoni": "/vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/libraries/Eukaryota.fa" ]
+    "c_elegans": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
+    "c_tropicalis": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
+    "c_briggsae": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/CBCE_mixed_custom_library.prot.fa",
+    "c_nigoni": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/Eukaryota.fa" ]
 
 def braker_proteome = proteome_map[params.species]
 
@@ -219,7 +219,7 @@ process busco_download {
 
     script:
     """
-    /opt/compleasm_kit/compleasm.py download nematoda_odb10 --odb 10
+    /opt/compleasm_kit/compleasm.py download nematoda_odb12 # --odb 12
 
     """
 }
@@ -294,7 +294,7 @@ process braker3 {
         --species ${species}_${strain} \
         --prot_seq ${braker_proteome} \
         --threads ${task.cpus} \
-        --busco_lineage=nematoda_odb10 \
+        --busco_lineage=nematoda_odb12 \
         --gff3 \
         --workingdir ${species}/${strain}/braker/output 
 
@@ -375,10 +375,10 @@ process busco_prot {
     """
     mkdir -p ${species}/${strain}/busco
 
-    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Nicolas/WI_PacBio_genomes/annotation/elegans/busco_downloads/lineages/nematoda_odb10/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/busco_lineages/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
     echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
-    grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb10.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
+    grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
     awk '{ match(\$0, /C:([0-9.]+)%/, a); print a[1] }' ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv 
     paste -d '\t' <(echo "$strain") ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp2.tsv <(echo "${workflow.launchDir}/${params.output}/${species}/${strain}/protein/${prot_path.baseName}.fa") > strain_busco.tsv
     
