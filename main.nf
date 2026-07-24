@@ -93,9 +93,9 @@ if (!braker_proteome) {
 
 // Which fasta to use for masking
 def mask_map= [
-    "c_elegans": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
-    "c_tropicalis": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
-    "c_briggsae": "/vast/eande106/projects/Bowen/PopGen_Tro_Project/2025_PopGen_Tro/processed_data/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
+    "c_elegans": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
+    "c_tropicalis": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
+    "c_briggsae": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
 
 def mask_file = mask_map[params.species]
 
