@@ -23,7 +23,7 @@ To run ONLY BRAKER3, use "--source only-braker" and provide a TSV to --sample_sh
   __/ |                                                                
  |___/                                                                 
 
-*/ 
+*/
 
 if (params.debug) {
     println """
@@ -77,10 +77,10 @@ if (params.debug) {
 
 // Which proteome BRAKER3 should use
 def proteome_map = [
-    "c_elegans": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_tropicalis": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
-    "c_briggsae": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/CBCE_mixed_custom_library.prot.fa",
-    "c_nigoni": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/annotation_libraries/Eukaryota.fa" ]
+    "c_elegans": "/vast/eande106/data/DBs/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
+    "c_tropicalis": "/vast/eande106/data/DBs/annotation_libraries/N2.WBonly.WS283.PConly.prot.fa",
+    "c_briggsae": "/vast/eande106/data/DBs/annotation_libraries/CBCE_mixed_custom_library.prot.fa",
+    "c_nigoni": "/vast/eande106/data/DBs/annotation_libraries/Eukaryota.fa" ]
 
 def braker_proteome = proteome_map[params.species]
 
@@ -93,9 +93,9 @@ if (!braker_proteome) {
 
 // Which fasta to use for masking
 def mask_map= [
-    "c_elegans": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Ce_repeats_bed_file/final_bed/Ce.clust.class.noProt.fa",
-    "c_tropicalis": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Ct_repeats_bed_file/final_bed/Ct.clust.class.noProt.fa",
-    "c_briggsae": "/vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/processed_data/bowen_masking/make_Cb_repeats_bed_file/final_bed/Cb.clust.class.noProt.fa"]
+    "c_elegans": "/vast/eande106/data/c_elegans/genomes/PRJNA13758/WS283/c_elegans.PRJNA13758.WS283.genome.mask_elements.fa",
+    "c_tropicalis": "/vast/eande106/data/c_tropicalis/genomes/NIC58_nanopore/June2021/c_tropicalis.NIC58_nanopore.June2021.genome.mask_elements.fa",
+    "c_briggsae": "/vast/eande106/data/c_briggsae/genomes/QX1410_nanopore/Feb2020/c_briggsae.QX1410_nanopore.Feb2020.genome.mask_elements.fa"]
 
 def mask_file = mask_map[params.species]
 
@@ -375,7 +375,7 @@ process busco_prot {
     """
     mkdir -p ${species}/${strain}/busco
 
-    busco -i $prot_path -c 12 -m prot -l /vast/eande106/projects/Lance/THESIS_WORK/gene_annotation/databases/busco_lineages/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/data/DBs/BUSCO/nematoda_odb12/nematoda_odb12 -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
     echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
     grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
