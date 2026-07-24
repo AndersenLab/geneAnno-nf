@@ -330,7 +330,7 @@ process busco_download {
 
     script:
     """
-    /opt/compleasm_kit/compleasm.py download nematoda_odb12 # --odb 10
+    /opt/compleasm_kit/compleasm.py download nematoda_odb12 # --odb 12
 
     """
 }
