@@ -592,7 +592,7 @@ process busco_prot {
     """
     mkdir -p ${species}/${strain}/busco
 
-    busco -i $prot_path -c 12 -m prot -l /vast/eande106/data/DBs/BUSCO/nematoda_odb12/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
+    busco -i $prot_path -c 12 -m prot -l /vast/eande106/data/DBs/BUSCO/nematoda_odb12/ -o ${species}/${strain}/busco/${prot_path.baseName}.busco -c ${task.cpus} --offline
 
     echo -e "strain\tbusco_completeness_protein\tproteome_path" > header.tsv
     grep "C:" ${species}/${strain}/busco/${prot_path.baseName}.busco/short_summary.specific.nematoda_odb12.${prot_path.baseName}.busco.txt > ${species}/${strain}/busco/${prot_path.baseName}.busco/tmp.tsv
