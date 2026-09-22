@@ -1,15 +1,10 @@
 This is a nextflow process that predicts gene models in *Caenorhabditis de novo* assembled genomes using BRAKER3 guided with reference/Eukaryota proteomes. 
 
-```
-                                                                    __ 
-                          /\                                       / _|
-  __ _  ___ _ __   ___   /  \   _ __  _ __   ___             _ __ | |_ 
- / _` |/ _ \ '_ \ / _ \ / /\ \ | '_ \| '_ \ / _ \   ______  | '_ \|  _|
-| (_| |  __/ | | |  __// ____ \| | | | | | | (_) | |______| | | | | |  
- \__, |\___|_| |_|\___/_/    \_\_| |_|_| |_|\___/           |_| |_|_|  
-  __/ |                                                                
- |___/                                                                 
-```
+<img alt="geneAnno-nf/workflow metro map" src="https://github.com/AndersenLab/geneAnno-nf/tree/CGC2_geneAnno/workflow_animation.png">
+
+Workflow diagram generated using [nf-metro](https://github.com/seqeralabs/nf-metro).
+
+
 This Nextflow process is meant to be run after [assembly-nf](https://github.com/AndersenLab/assembly-nf), and it will add full paths to files produced and busco protein stats directly to the stats sheet output from assembly-nf.
 
 This branch does not contain the `--mode` parameter to specify the type of external data to guide gene model predictions. Default protein databases will be used to guide gene models based on the `--species` that is specified. To guide gene model prediction with RNA and/or protein data, see branch `CGC2_geneAnno`. 
