@@ -1,7 +1,7 @@
 This is a nextflow process that predicts gene models in *Caenorhabditis de novo* assembled genomes using BRAKER3 guided with reference/Eukaryota proteomes. 
 
 
-<img alt="geneAnno-nf/workflow metro map" src="https://github.com/AndersenLab/geneAnno-nf/tree/CGC2_geneAnno/workflow_animation.png">
+<img alt="geneAnno-nf/workflow metro map" src="https://raw.githubusercontent.com/AndersenLab/geneAnno-nf/CGC2_geneAnno/workflow_animation.png">
 
 Workflow diagram generated using [nf-metro](https://github.com/seqeralabs/nf-metro).
 
